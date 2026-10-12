@@ -15,6 +15,9 @@ import (
 	"time"
 )
 
+// version is set at release time with -ldflags "-X main.version=...".
+var version = "dev"
+
 const usageText = `ngsfc - Next Gen System File Checker
 
 Usage:
@@ -24,6 +27,7 @@ Usage:
   ngsfc quick  [--recursive] [--all] [--json] [<path>...]
                                                   signature sweep of system binaries; no elevation
   ngsfc status [--json]                           elevation, pending reboot, servicing stack, last scan
+  ngsfc version                                   print the version
 
 scan and file also take --offwindir, --offbootdir and --offlogfile for an offline image.
 
@@ -44,6 +48,9 @@ func main() {
 	switch os.Args[1] {
 	case "-h", "--help", "help", "/?":
 		fmt.Print(usageText)
+		return
+	case "version", "--version":
+		fmt.Println("ngsfc", version)
 		return
 	}
 	cmd, ok := cmds[strings.ToLower(os.Args[1])]
