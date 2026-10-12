@@ -303,10 +303,10 @@ service. The reasoning and evidence are in
 Stated plainly, because this tool makes claims about system integrity:
 
 - **Windows only**, 64-bit. Developed and tested on Windows 11.
-- **Only some log formats have been seen for real.** A clean scan and
-  driver-file (`[Pnp] Corrupt file`) findings are verified against real logs.
-  Component (`[SR]`) corruption lines and all repair lines are parsed from the
-  documented format and the templates inside `wrpint.dll`.
+- **Only some log formats have been seen for real.** A clean scan, and
+  driver files being flagged and then repaired (`[Pnp]` lines), are verified
+  against real logs. Component (`[SR]`) corruption lines are parsed from the
+  documented format; no machine with that kind of damage was available.
   If ngsfc misreads a log on your system,
   [open an issue](https://github.com/MAXIVA11/NextGenSFC/issues) with the
   `[SR]` lines attached.

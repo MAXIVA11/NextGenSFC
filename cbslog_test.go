@@ -60,7 +60,11 @@ func TestParseAndSummarize(t *testing.T) {
 
 // The Corrupt lines are verbatim from a verify-only scan on the development
 // machine; the other three follow the remaining [Pnp] templates in wrpint.dll.
-const pnpLog = `2026-10-12 21:12:07, Info                  CSI    00000210 [SR] Verify complete
+const pnpLog = `2026-10-12 21:10:59, Info                  CBS    TiWorker: Client requests SFP repair object.
+2026-10-12 21:11:01, Info                  CSI    00000007 [SR] Verifying 100 components
+2026-10-12 21:11:30, Info                  DEPLOY [Pnp] Corrupt file: C:\WINDOWS\System32\drivers\old.sys
+2026-10-12 21:12:00, Info                  CBS    TiWorker: Client requests SFP repair object.
+2026-10-12 21:12:07, Info                  CSI    00000210 [SR] Verify complete
 2026-10-12 21:12:07, Info                  DEPLOY [Pnp] Corrupt file: C:\WINDOWS\System32\drivers\BthA2dp.sys
 2026-10-12 21:12:08, Info                  DEPLOY [Pnp] Corrupt file: C:\WINDOWS\system32\DRIVERS\usbvideo.sys
 2026-10-12 21:12:09, Info                  DEPLOY [Pnp] Repaired file: C:\WINDOWS\System32\drivers\usbvideo.sys
@@ -73,9 +77,11 @@ func TestDriverLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) != 6 {
-		t.Fatalf("got %d events, want 6", len(evs))
+	if len(evs) != 10 {
+		t.Fatalf("got %d events, want 10", len(evs))
 	}
+	// The two scans are a minute apart; only the start marker separates them.
+	evs = lastRun(evs, 30*time.Minute)
 	sum := summarize(evs)
 	if len(sum.Files) != 3 || sum.unrepaired() != 2 {
 		t.Fatalf("summary = %+v", sum)

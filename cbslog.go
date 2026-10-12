@@ -25,6 +25,7 @@ type SREvent struct {
 // Event kinds. The prefixes they are matched on are the same word sequences
 // sfc.exe itself carries in .rdata for summarising the log.
 const (
+	KindScanStart      = "scan-start"
 	KindVerifyStart    = "verify-start"
 	KindVerifyComplete = "verify-complete"
 	KindRepairStart    = "repair-start"
@@ -97,8 +98,16 @@ func parsePnpLine(line string) (SREvent, bool) {
 	return ev, true
 }
 
+// scanStartMarker is logged once per client of the repair service, i.e. once
+// per sfc invocation, even when several run inside one TiWorker session.
+const scanStartMarker = "Client requests SFP repair object"
+
 func parseSRLine(line string) (SREvent, bool) {
 	line = strings.TrimRight(line, "\r\n")
+	if strings.Contains(line, scanStartMarker) && len(line) >= 19 {
+		ts, err := time.ParseInLocation("2006-01-02 15:04:05", line[:19], time.Local)
+		return SREvent{Time: ts, Kind: KindScanStart, Message: scanStartMarker}, err == nil
+	}
 	if strings.Contains(line, "[Pnp]") {
 		return parsePnpLine(line)
 	}
@@ -139,7 +148,7 @@ func readSREvents(r io.Reader) ([]SREvent, error) {
 	sc.Buffer(make([]byte, 0, 1<<20), 16<<20)
 	for sc.Scan() {
 		line := strings.TrimPrefix(sc.Text(), "\ufeff")
-		if !strings.Contains(line, "[SR]") && !strings.Contains(line, "[Pnp]") {
+		if !strings.Contains(line, "[SR]") && !strings.Contains(line, "[Pnp]") && !strings.Contains(line, scanStartMarker) {
 			continue
 		}
 		if ev, ok := parseSRLine(line); ok {
@@ -186,6 +195,11 @@ func findSRLog() (string, []SREvent, error) {
 // lastRun trims evs to the most recent burst of activity: everything after the
 // last gap longer than maxGap.
 func lastRun(evs []SREvent, maxGap time.Duration) []SREvent {
+	for i := len(evs) - 1; i >= 0; i-- {
+		if evs[i].Kind == KindScanStart {
+			return evs[i:]
+		}
+	}
 	for i := len(evs) - 1; i > 0; i-- {
 		if evs[i].Time.Sub(evs[i-1].Time) > maxGap {
 			return evs[i:]
