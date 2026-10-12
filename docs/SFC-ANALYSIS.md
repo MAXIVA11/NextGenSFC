@@ -133,12 +133,33 @@ upload — it parses the per-file details for Microsoft but never shows them to
 the user. **[unknown]** whether this path still runs when CEIP is off, and
 whether `sqmapi.dll` is functional on this build.
 
-## 7. Not established
+## 7. The driver check logs under a second tag
+
+**[observed]** A verify-only scan on the analysis machine ended with message
+`…100B` (violations found) while the CBS log held no `[SR]` line other than
+`Verifying N components` / `Verify complete`. The findings were five lines of
+the form:
+
+```
+2026-10-12 21:12:07, Info                  DEPLOY [Pnp] Corrupt file: C:\WINDOWS\System32\drivers\BthA2dp.sys
+```
+
+**[observed]** `wrpint.dll` contains exactly four such templates:
+`[Pnp] Corrupt file: {0}`, `[Pnp] Repaired file: {0}`,
+`[Pnp] Failed repairing file: {0}`, `[Pnp] Failed verifying file: {0}`.
+
+**[inferred]** After the component pass the engine checks driver files against
+the driver store. Anyone following the usual advice to search CBS.log for
+`[SR]` misses these entirely. **[unknown]** what the check compares: two of the
+five flagged files carry a valid embedded Microsoft signature.
+
+## 8. Not established
 
 - How TrustedInstaller verifies a file (hash algorithm, manifest lookup).
 - Exact layout of the stats structure beyond offsets 0, 4 and 0x10.
 - Real `[SR]` corruption lines: this machine's logs contain only clean
-  `Verifying N components` / `Verify complete` entries.
+  `Verifying N components` / `Verify complete` entries. Only the `[Pnp] Corrupt
+  file` line has been seen for real.
 
 ## What this means for ngsfc
 

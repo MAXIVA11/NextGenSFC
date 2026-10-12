@@ -58,6 +58,36 @@ func TestParseAndSummarize(t *testing.T) {
 	}
 }
 
+// The Corrupt lines are verbatim from a verify-only scan on the development
+// machine; the other three follow the remaining [Pnp] templates in wrpint.dll.
+const pnpLog = `2026-10-12 21:12:07, Info                  CSI    00000210 [SR] Verify complete
+2026-10-12 21:12:07, Info                  DEPLOY [Pnp] Corrupt file: C:\WINDOWS\System32\drivers\BthA2dp.sys
+2026-10-12 21:12:08, Info                  DEPLOY [Pnp] Corrupt file: C:\WINDOWS\system32\DRIVERS\usbvideo.sys
+2026-10-12 21:12:09, Info                  DEPLOY [Pnp] Repaired file: C:\WINDOWS\System32\drivers\usbvideo.sys
+2026-10-12 21:12:09, Info                  DEPLOY [Pnp] Failed repairing file: C:\WINDOWS\System32\drivers\BthA2dp.sys
+2026-10-12 21:12:09, Info                  DEPLOY [Pnp] Failed verifying file: C:\WINDOWS\System32\drivers\x.sys
+`
+
+func TestDriverLines(t *testing.T) {
+	evs, err := readSREvents(strings.NewReader(pnpLog))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) != 6 {
+		t.Fatalf("got %d events, want 6", len(evs))
+	}
+	sum := summarize(evs)
+	if len(sum.Files) != 3 || sum.unrepaired() != 2 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	if f := sum.Files[1]; !f.Repaired || !strings.HasSuffix(f.File, "usbvideo.sys") {
+		t.Errorf("usbvideo not marked repaired: %+v", f)
+	}
+	if f := sum.Files[0]; f.Repaired || f.Reason != "driver repair failed" {
+		t.Errorf("BthA2dp: %+v", f)
+	}
+}
+
 func TestClassify(t *testing.T) {
 	msgs := sfcMessages{
 		msgNoViolations:    "\r\nWindows Resource Protection did not find any integrity violations.",

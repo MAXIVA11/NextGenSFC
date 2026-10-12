@@ -240,7 +240,7 @@ func printSummary(s SRSummary) {
 	if len(s.Files) > 0 {
 		fmt.Printf("Files flagged: %d (%d not repaired)\n", len(s.Files), s.unrepaired())
 		for _, f := range s.Files {
-			state := "NOT REPAIRED"
+			state := "corrupt"
 			if f.Repaired {
 				state = "repaired"
 			}
@@ -248,7 +248,7 @@ func printSummary(s SRSummary) {
 			if f.Reason != "" {
 				reason = "  (" + f.Reason + ")"
 			}
-			fmt.Printf("  %-12s  %s%s\n", state, f.File, reason)
+			fmt.Printf("  %-8s  %s%s\n", state, f.File, reason)
 		}
 	}
 	for _, n := range s.Notes {

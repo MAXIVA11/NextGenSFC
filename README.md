@@ -105,16 +105,24 @@ ngsfc scan --repair              verify and repair
 ngsfc scan --repair --escalate   if repair fails, run DISM /RestoreHealth, then scan again
 ```
 
-Illustrative output for a system with one repairable and one unrepairable file:
+Real output from a verify-only scan (`sfc /verifyonly` on the same machine says
+only "found integrity violations"):
 
 ```
-Corruption found; some files could not be repaired.  [unrepaired, 412.6s]
+> ngsfc scan
+Integrity violations found (verify only; nothing was changed).  [violations-found, 70.1s]
 Components verified: 22769
-Files flagged: 2 (1 not repaired)
-  repaired      C:\WINDOWS\System32\utilman.exe
-  NOT REPAIRED  C:\WINDOWS\SysWOW64\opencl.dll  (hash mismatch)
-Next: re-run with --repair --escalate to repair the component store with DISM first.
+Files flagged: 5 (5 not repaired)
+  corrupt   C:\WINDOWS\System32\drivers\BthA2dp.sys  (failed driver store check)
+  corrupt   C:\WINDOWS\System32\drivers\BthHfEnum.sys  (failed driver store check)
+  corrupt   C:\WINDOWS\System32\drivers\bthmodem.sys  (failed driver store check)
+  corrupt   C:\WINDOWS\system32\DRIVERS\UMDF\SecureUSBVideo.dll  (failed driver store check)
+  corrupt   C:\WINDOWS\system32\DRIVERS\usbvideo.sys  (failed driver store check)
+Next: re-run with --repair.
 ```
+
+These five are driver files, which the engine logs under a `[Pnp]` tag rather
+than the `[SR]` tag every guide tells you to search for. ngsfc reads both.
 
 `--escalate` downloads replacement files through Windows Update, exactly as
 running `DISM /Online /Cleanup-Image /RestoreHealth` by hand would.
@@ -295,8 +303,10 @@ service. The reasoning and evidence are in
 Stated plainly, because this tool makes claims about system integrity:
 
 - **Windows only**, 64-bit. Developed and tested on Windows 11.
-- **Corruption-line parsing is tested against the documented `[SR]` format, not
-  against a genuinely corrupt machine.** Reading back a real clean scan is verified.
+- **Only some log formats have been seen for real.** A clean scan and
+  driver-file (`[Pnp] Corrupt file`) findings are verified against real logs.
+  Component (`[SR]`) corruption lines and all repair lines are parsed from the
+  documented format and the templates inside `wrpint.dll`.
   If ngsfc misreads a log on your system,
   [open an issue](https://github.com/MAXIVA11/NextGenSFC/issues) with the
   `[SR]` lines attached.

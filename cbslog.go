@@ -37,6 +37,10 @@ const (
 	KindManifestBackup = "manifest-recovered"
 	KindReferencedBy   = "referenced-by"
 	KindNotFound       = "component-not-found"
+	KindDriverCorrupt  = "driver-corrupt"
+	KindDriverRepaired = "driver-repaired"
+	KindDriverFailed   = "driver-repair-failed"
+	KindDriverUnverif  = "driver-verify-failed"
 	KindOther          = "other"
 )
 
@@ -56,15 +60,49 @@ var srPrefixes = []struct{ prefix, kind string }{
 	{"Repairing", KindRepairStart},
 }
 
+// The engine also checks driver files against the driver store and logs those
+// results under a different tag. These are the four templates in wrpint.dll.
+var pnpPrefixes = []struct{ prefix, kind, reason string }{
+	{"Corrupt file: ", KindDriverCorrupt, "failed driver store check"},
+	{"Repaired file: ", KindDriverRepaired, ""},
+	{"Failed repairing file: ", KindDriverFailed, "driver repair failed"},
+	{"Failed verifying file: ", KindDriverUnverif, "driver file could not be verified"},
+}
+
 var (
+	pnpLineRe  = regexp.MustCompile(`^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d), \w+\s+DEPLOY\s+\[Pnp\] (.*)$`)
 	srLineRe   = regexp.MustCompile(`^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d), \w+\s+CSI\s+[0-9a-fA-F]+ \[SR\] (.*)$`)
 	srNameRe   = regexp.MustCompile(`\[(?:ml|l):\d+(?:\{\d+\})?\]['"]([^'"]*)['"]`)
 	srPathRe   = regexp.MustCompile(`(\\(?:\?\?|SystemRoot)\\[^\[]*)\[`)
 	srReasonRe = regexp.MustCompile(`(hash mismatch|file is missing|file cannot be checked|manifest is damaged)`)
 )
 
+func parsePnpLine(line string) (SREvent, bool) {
+	m := pnpLineRe.FindStringSubmatch(line)
+	if m == nil {
+		return SREvent{}, false
+	}
+	ts, err := time.ParseInLocation("2006-01-02 15:04:05", m[1], time.Local)
+	if err != nil {
+		return SREvent{}, false
+	}
+	ev := SREvent{Time: ts, Kind: KindOther, Message: m[2]}
+	for _, p := range pnpPrefixes {
+		if strings.HasPrefix(m[2], p.prefix) {
+			ev.Kind, ev.Reason = p.kind, p.reason
+			ev.File = strings.TrimSpace(strings.TrimPrefix(m[2], p.prefix))
+			break
+		}
+	}
+	return ev, true
+}
+
 func parseSRLine(line string) (SREvent, bool) {
-	m := srLineRe.FindStringSubmatch(strings.TrimRight(line, "\r\n"))
+	line = strings.TrimRight(line, "\r\n")
+	if strings.Contains(line, "[Pnp]") {
+		return parsePnpLine(line)
+	}
+	m := srLineRe.FindStringSubmatch(line)
 	if m == nil {
 		return SREvent{}, false
 	}
@@ -101,7 +139,7 @@ func readSREvents(r io.Reader) ([]SREvent, error) {
 	sc.Buffer(make([]byte, 0, 1<<20), 16<<20)
 	for sc.Scan() {
 		line := strings.TrimPrefix(sc.Text(), "\ufeff")
-		if !strings.Contains(line, "[SR]") {
+		if !strings.Contains(line, "[SR]") && !strings.Contains(line, "[Pnp]") {
 			continue
 		}
 		if ev, ok := parseSRLine(line); ok {
@@ -207,7 +245,7 @@ func summarize(evs []SREvent) SRSummary {
 				}
 				s.ComponentsVerified += n
 			}
-		case KindCannotRepair, KindReprojectFail:
+		case KindCannotRepair, KindReprojectFail, KindDriverCorrupt, KindDriverFailed, KindDriverUnverif:
 			if ev.File == "" {
 				break
 			}
@@ -216,7 +254,7 @@ func summarize(evs []SREvent) SRSummary {
 			if ev.Reason != "" {
 				f.Reason = ev.Reason
 			}
-		case KindRepairing, KindRepaired:
+		case KindRepairing, KindRepaired, KindDriverRepaired:
 			if ev.File != "" {
 				get(ev.File).Repaired = true
 			}
